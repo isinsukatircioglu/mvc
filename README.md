@@ -7,7 +7,10 @@ This is the source code for the ICCV'21 paper "Human Detection and Segmentation 
 <li> Cuda 9.2
   
 ## Training
-  Change the dataset path in the files dataset/dataset_factory.py and dataset/SkiPTZ.py. You can start training with the following command:
+  - Change the dataset path in the files dataset/dataset_factory.py and dataset/SkiPTZ.py. 
+  - Create a folder named pretrained in the cloned directory and put the pre-trained models inside.
+  
+  You can start training with the following command:
 ```
 $ cd src
 $ python configs/run_config.py configs/config_dict_mvc_ski.py

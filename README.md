@@ -16,4 +16,12 @@ This is the source code for the ICCV'21 paper "Human Detection and Segmentation 
 $ cd src
 $ python configs/run_config.py configs/config_dict_mvc_ski.py
 ```
- 
+ ## Citation
+  Please cite the paper in your publications if it helps your research:
+  ```
+@inproceedings{Katircioglu21,
+	Author = {I. Katircioglu and H. Rhodin and J. Sp{\"o}rri and M. Salzmann and P. Fua},
+	Booktitle = ICCV,
+	Title = {{Human Detection and Segmentation via Multi-view Consensus}},
+	Year = 2021}
+```

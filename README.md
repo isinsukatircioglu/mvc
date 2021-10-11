@@ -3,7 +3,7 @@ This is the source code for the ICCV'21 paper "Human Detection and Segmentation 
 
 ## Dependencies
 <li> Python 3.6
-<li> PyTorch 1.4
+<li> PyTorch 1.5
 <li> Cuda 9.2
   
 ## Training

@@ -1,6 +1,6 @@
 # Human Detection and Segmentation via Multi-view Consensus 
 This is the source code for the ICCV 2021 paper "Human Detection and Segmentation via Multi-view Consensus".
-
+![Screenshot](multiview_consensus.png)
 ## Dependencies
 <li> Python 3.6
 <li> PyTorch 1.5

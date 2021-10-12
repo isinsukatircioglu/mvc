@@ -6,22 +6,15 @@ import numpy.linalg as la
 import torch
 import torch.utils.data as data
 import cv2
-
 import pickle
-
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from skimage.transform import warp
-# from skimage import data
 from scipy import misc
 import imageio
 from random import shuffle
-
-
 import IPython
-
 import scipy
-
 import pdb
 import math
 import sys
@@ -35,9 +28,7 @@ import CropPipeline.utils as utils_crop
 from CropPipeline.BoundingBoxes.square_bounding_box import BoundingBox
 from CropPipeline.CropCompensation import projection
 from datasets import transforms as transforms_aug
-# from torch.utils.data import dataloader
 from tqdm import tqdm
-
 
 class Sequence_DLT:
     def __init__(self, base_folder, input_types, label_types,
@@ -79,7 +70,6 @@ class Sequence_DLT:
         self.margin = bbox_margin  # 0.4 is default
         self.joint_transformation = joint_transformation
         self.root_index = root_index
-
 
         # load skier and reference positions
         trial = self.trial
@@ -164,10 +154,6 @@ class Sequence_DLT:
                         K = K / K[2, 2]
                         R = T @ q  # (T is its own inverse)
 
-                        # flip x coords
-                        # K[:,1] *= -1
-                        # R[1,:] *= -1
-
                         assert np.linalg.det(R) > 0
                         R_mRC = np.concatenate([R, - R @ C.reshape(3, 1)], 1)
 
@@ -181,13 +167,6 @@ class Sequence_DLT:
                 camera_extrinsics_inverse.append(extrinsics_inverse_single_cam)
                 camera_intrinsics_inverse.append(intrinsics_inverse_single_cam)
 
-                # debugging
-                # RT_0 = np.array(extrinsics_single_cam[100])
-                # K_0  = np.array(intrinsics_single_cam[100], dtype=int)
-                # RT_1 = np.array(extrinsics_single_cam[120])
-                # K_1  = np.array(intrinsics_single_cam[120], dtype=int)
-                # print(RT_0,"\n",RT_1)
-                # print(K_0,"\n",K_1)
         self.camera_extrinsics = camera_extrinsics
         self.camera_intrinsics = camera_intrinsics
         self.camera_extrinsics_inverse = camera_extrinsics_inverse
@@ -327,148 +306,9 @@ class Sequence_DLT:
             msk_read = cv2.resize(msk_read, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_NEAREST)
 
         # load and crop image
-        img_read = imageio.imread(file_name) #####KEEEEP THIIIIIS
-        #img_read = imageio.imread('/cvlabsrc1/cvlab/datasets_ski/Kuetai_2011/flat4_noshad4.jpg')
+        img_read = imageio.imread(file_name)
         img_raw = img_read.copy()
-
         orig_image_size = (720,1280)
-
-        # plotting of cameras, reference points and skier-head position
-        if 0:
-            plt.close("all")
-            plt.switch_backend('Qt5Agg')
-
-            # show inout image
-            if 0:
-                fig = plt.figure(0)
-                ax = fig.add_subplot(111)
-                ax.imshow(img_raw)
-                plt.show()
-
-            fig = plt.figure(0)
-            plt.clf()
-            ax = fig.add_subplot(111, projection='3d')
-
-            display_interval = [50, 150]
-
-            # all skeleton
-            if 1:
-                # for fi in range(0, len(self.pose_list), 5): #[0,5,10,15,20,25]:
-                for fi in range(display_interval[0], display_interval[1],
-                                15):  # range(0,self.position_ski_tensor.shape[0]): #np.add([0,5,10,15], 100):
-                    pose = utils_plt.ski_spoerri_to_h36m @ self.position_ski_tensor[fi, :, :]
-                    utils_plt.plot_3Dpose(ax, pose.T, bones=utils_plt.bones_h36m, radius=0.01, set_limits=False,
-                                          flip_yz=False)
-
-            # selected skeleton
-            pose = self.joint_transformation @ self.position_ski_tensor[frame_id, :, :]
-            utils_plt.plot_3Dpose(ax, pose.T, bones=utils_plt.bones_h36m, radius=0.01, set_limits=False, flip_yz=False)
-            mean_position = np.mean(pose, 0)
-
-            # all camera positions
-            C_list = []
-            if 1:
-                M_dirs = []
-                v_dirs = []
-                for ci in self.camera_indices_db:
-                    K = self.camera_intrinsics[ci][frame_id]
-                    RT = self.camera_extrinsics[ci][frame_id]
-                    R_world_2_cam = RT[:, :3]
-                    cam_center = - np.linalg.inv(R_world_2_cam) @ RT[:, -1]
-
-                    C_list.append(cam_center)
-                    ax.plot([cam_center[0]], [cam_center[1]], [cam_center[2]], marker='*')
-                    utils_plt.plot_camera(ax, cam_center, R=np.linalg.inv(R_world_2_cam), scale=5)
-
-                    dir = np.asarray(np.array([0, 0, 1]) @ np.linalg.inv(R_world_2_cam).T).squeeze()
-                    dir_mat = np.array([dir])
-                    M_dir = np.eye(3) - dir_mat.T @ dir_mat
-                    M_dirs.append(M_dir)
-                    v_dirs.append(M_dir @ cam_center)
-
-                    # focus point (intersection of cams)
-                    M_dir = sum(M_dirs)
-                    v_dir = sum(v_dirs)
-                    focus_point = np.linalg.pinv(M_dir) @ v_dir
-                    ax.scatter([focus_point[0]], [focus_point[1]], [focus_point[2]], marker='.', color='k')
-                    print("focus - centroid = ", focus_point - mean_position)
-
-            # cam pose manual
-            if 0:
-                cam_positions_manual = np.array([
-                    [-48.28464492, -23.90136305, 22.6106],
-                    [-4.176177201, -26.64898311, 0.7339],
-                    [38.66779566, -19.82369408, -19.199],
-                    [47.13089218, 20.86820266, -19.2322],
-                    [31.7991024, 23.32644215, -11.4949],
-                    [-20.91136954, 27.70749056, 14.3635]])
-
-                cam_positions_manual_DLT = np.array(cam_positions_manual)
-
-                print(cam_positions_manual_DLT - cam_positions_manual)
-                # print(cam_positions_manual)
-                # ax.scatter([cam_positions_manual_DLT[:2,0]], [cam_positions_manual_DLT[:2,1]], [cam_positions_manual_DLT[:2,2]], marker='.', color='k')
-                ax.scatter([cam_positions_manual[:, 0]], [cam_positions_manual[:, 1]], [cam_positions_manual[:, 2]],
-                           marker='.', color='r')
-
-            # focus points
-            if 0:
-                focus_points = []
-                mean_positions = []
-                for fi in range(display_interval[0], display_interval[1],
-                                15):  # range(0,self.position_ski_tensor.shape[0]): #np.add([0,5,10,15], 100):
-                    M_dirs = []
-                    v_dirs = []
-                    for ci in self.camera_indices_db:
-                        K = self.camera_intrinsics[ci][fi].copy()
-                        RT = self.camera_extrinsics[ci][fi].copy()
-                        R_world_2_cam = RT[:, :3]
-                        cam_center = - np.linalg.inv(R_world_2_cam) @ RT[:, -1]
-
-                        # ax.plot([cam_center[0]], [cam_center[1]], [cam_center[2]], marker='*')
-                        # utils_plt.plot_camera(ax, cam_center, R=np.linalg.inv(R), scale=5)
-                        R_cam2World = np.linalg.inv(R_world_2_cam)
-                        dir = np.asarray(np.array([0, 0, 1]) @ R_cam2World.T).squeeze()
-                        dir_mat = np.array([dir])
-                        M_dir = np.eye(3) - dir_mat.T @ dir_mat
-                        M_dirs.append(M_dir)
-                        v_dirs.append(M_dir @ cam_center)
-
-                    # skeleton position
-                    pose = utils_plt.ski_spoerri_to_h36m @ self.position_ski_tensor[fi, :, :]
-                    mean_position = np.mean(pose, 0)
-                    mean_positions.append(mean_position)
-
-                    # focus point (intersection of cams)
-                    M_dir = sum(M_dirs)
-                    v_dir = sum(v_dirs)
-                    focus_point = np.linalg.pinv(M_dir) @ v_dir
-                    focus_points.append(focus_point)
-                focus_points = np.stack(focus_points)
-                mean_positions = np.stack(mean_positions)
-                diff = mean_positions - focus_points
-                print("diff-mean-focus", diff)
-                for s, f in zip(mean_positions, focus_points):
-                    ax.plot([s[0], f[0]], [s[1], f[1]], [s[2], f[2]], color='red')
-                ax.scatter(focus_points[:, 0], focus_points[:, 1], focus_points[:, 2], marker='.', color='k')
-
-            # skier trajectories
-            if 0:
-                num_joints = self.pose_list[0]
-                for bi in range(0, len(num_joints)):
-                    # X = [pose[bi][0]-32    for pose in self.pose_list]
-                    # Y = [pose[bi][1]+5    for pose in self.pose_list]
-                    # Z = [pose[bi][2]-2    for pose in self.pose_list]
-                    X = [pose[bi][0] for pose in self.pose_list]
-                    Y = [pose[bi][1] for pose in self.pose_list]
-                    Z = [pose[bi][2] for pose in self.pose_list]
-                    ax.plot(X, Y, Z)
-
-            ax.set_xlabel('x')
-            ax.set_ylabel('y')
-            ax.set_zlabel('z')
-            plt.show()
-
         K, R_world_2_cam, R_cam_2_world, cam_center, cam_ext, cam_int_inv, cam_ext_inv = self.retrieveCameraRepresentation(cam_id, frame_id)
         pose_3d_w, pose_3d_c, pose_3d_centered_c, pose_2d_px = self.projectPoseToCam(frame_id, K, cam_center,
                                                                                      R_world_2_cam)
@@ -575,9 +415,7 @@ class Sequence_DLT:
             transformation_instances = self.augmentation.parametrize_and_randomize(label_dict=combined_dict,
                                                                                    batch_index=0)  # TODO
             self.augmentation.apply(transformation_instances, combined_dict,
-                                    [360, 640]) # TODO HACK, HARDCODED ICCV 19
-           # [self.input_img_width, self.input_img_width])
-            # self.augmentation.apply(transformation_instances, label_dict, output_shape_pixel=[256, 256]) # TODO
+                                    [360, 640]) 
 
             combined_dict['trans_2d'] = np.array(transformation_instances['trans2D'], dtype='float32')
             combined_dict['trans_2d_inv'] = np.array(np.linalg.inv(transformation_instances['trans2D']),
@@ -818,259 +656,3 @@ class SkiPanTiltDataset_DLT(data.Dataset):
             trial, frame_id, cam_id = self.index_to_seq_frame_cam_sub[index]
             return self.trial_data[trial].getitem_single(frame_id, cam_id, index)
 
-
-if __name__ == '__main__':
-    dataset_folder = '/cvlabdata1/cvlab/datasets_ski/Kuetai_2011/'
-    dataset = SkiPanTiltDataset_DLT(base_folder=dataset_folder,
-                                    augmentation=None,
-                                    #                       input_types=['img'],
-                                    input_types=[],
-                                    label_types=['2D_fullSize', '3D_global', '3D_world',
-                                                 'trial', 'image_frame', 'camera',
-                                                 'extrinsic_rot', 'extrinsic_pos', 'intrinsic'],
-                                    input_img_width=512, map_width=32,
-                                    subjects=[0, 1, 2, 3, 4, 5],
-                                    useCamBatches=0,
-                                    useSequentialFrames=False,
-                                    every_nth_frame=1,
-                                    # joint_transformation=utils_plt.ski_spoerri_to_h36m,
-                                    joint_transformation=utils_plt.ski_spoerri_to_roman,
-                                    root_index=utils_plt.root_index_h36m,
-                                    #                       study_id=3 # IMPORTANT
-                                    study_id=3  # IMPORTANT
-                                    )
-
-    dataset_dict = {}
-
-    # save out 2D positions for Roman
-    if 1:
-        print('Loading annotations')
-        for fi in tqdm(range(len(dataset))):
-            inputs, labels = dataset.__getitem__(fi)
-
-            pose_2D_px = labels['2D_fullSize'].reshape([-1, 2])
-            pose_3D_cam = labels['3D_global'].reshape([-1, 3])
-            pose_3D_world = labels['3D_world'].reshape([-1, 3])
-
-            extrinsic_rot = labels['extrinsic_rot']
-            extrinsic_pos = labels['extrinsic_pos']
-            intrinsic = labels['intrinsic']
-
-            trial = labels['trial'][0]
-            frame = labels['image_frame'][0]
-            cam = labels['camera'][0]
-
-            if trial not in dataset_dict:
-                dataset_dict[trial] = {}
-            if cam not in dataset_dict[trial]:
-                dataset_dict[trial][cam] = {}
-
-            dataset_dict[trial][cam][frame] = {'2D': pose_2D_px, '3D': pose_3D_cam, '3D_world': pose_3D_world,
-                                               'intrinsic': intrinsic, 'extrinsic_rot': extrinsic_rot,
-                                               'extrinsic_pos': extrinsic_pos}
-
-            # print debug image
-            if 0:
-                # input image
-                img = inputs['img']
-                plt.switch_backend('Qt5Agg')
-                fig = plt.figure(0)
-                ax = fig.add_subplot(111)
-                ax.imshow(img)
-                utils_plt.plot_2Dpose(ax, pose_2D_px.reshape(-1, 2).T * np.flipud(img.shape[:2]).reshape([2, 1]),
-                                      bones=utils_plt.bones_roman, color_order=list(range(len(utils_plt.bones_roman))))
-                plt.show()
-
-        count = 0
-        import os
-        import csv
-
-        output_folder = '{}Data/NEW_Roman_Position_Data'.format(dataset_folder)
-        os.makedirs(output_folder, exist_ok=True)
-        print('Saving annotations to ', output_folder)
-        for trial in dataset_dict.keys():
-            for cam in dataset_dict[trial].keys():
-                # csv_filename = '{}Data/2D_Position_Data/Trial_{}_Cam_{}_Position2D.csv'.format(dataset_folder,int(trial),int(cam))
-                csv_filename_2d = '{}/Trial_{}_Cam_{}_Position2D.csv'.format(output_folder, int(trial), int(cam))
-                csv_filename_3d = '{}/Trial_{}_Cam_{}_Position3D.csv'.format(output_folder, int(trial), int(cam))
-                csv_filename_intr = '{}/Trial_{}_Cam_{}_cam_intrinsic.csv'.format(output_folder, int(trial), int(cam))
-                csv_filename_rot = '{}/Trial_{}_Cam_{}_R_world2cam.csv'.format(output_folder, int(trial), int(cam))
-                csv_filename_pos = '{}/Trial_{}_Cam_{}_cam_pos.csv'.format(output_folder, int(trial), int(cam))
-                with open(csv_filename_2d, 'w') as csvfile:
-                    writer = csv.writer(csvfile, delimiter=',')
-                    for frame in dataset_dict[trial][cam].keys():
-                        count += 1
-                        writer.writerow([int(frame), *dataset_dict[trial][cam][frame]['2D'].reshape([-1])])
-                with open(csv_filename_3d, 'w') as csvfile:
-                    writer = csv.writer(csvfile, delimiter=',')
-                    for frame in dataset_dict[trial][cam].keys():
-                        writer.writerow([int(frame), *dataset_dict[trial][cam][frame]['3D'].reshape([-1])])
-                with open(csv_filename_intr, 'w') as csvfile:
-                    writer = csv.writer(csvfile, delimiter=',')
-                    for frame in dataset_dict[trial][cam].keys():
-                        writer.writerow([int(frame), *dataset_dict[trial][cam][frame]['intrinsic'].reshape([-1])])
-                with open(csv_filename_rot, 'w') as csvfile:
-                    writer = csv.writer(csvfile, delimiter=',')
-                    for frame in dataset_dict[trial][cam].keys():
-                        writer.writerow([int(frame), *dataset_dict[trial][cam][frame]['extrinsic_rot'].reshape([-1])])
-                with open(csv_filename_pos, 'w') as csvfile:
-                    writer = csv.writer(csvfile, delimiter=',')
-                    for frame in dataset_dict[trial][cam].keys():
-                        writer.writerow([int(frame), *dataset_dict[trial][cam][frame]['extrinsic_pos'].reshape([-1])])
-            csv_filename_3d_world = '{}/Trial_{}_World_Position3D.csv'.format(output_folder, int(trial))
-            with open(csv_filename_3d_world, 'w') as csvfile:
-                writer = csv.writer(csvfile, delimiter=',')
-                for frame in dataset_dict[trial][cam].keys():
-                    writer.writerow([int(frame), *dataset_dict[trial][cam][frame]['3D_world'].reshape([-1])])
-        print('Saved {} frames'.format(count))
-        exit()
-
-    # if __name__ == '__main__XXXXXXXXXXXXXXXXXXXXXXXXXXXXX':
-    dataset_folder = '/cvlabdata1/cvlab/datasets_ski/Kuetai_2011/'
-
-    # calculate mean and std
-    if 0:
-        dataset = SkiPanTiltDataset_DLT(base_folder=dataset_folder,
-                                        # image_folder='/cvlabdata1/cvlab/dataset_ski_drone_goPro/professional_trainings/Zermatt-Bugnard2', start_frame=300, crop_init_size=0.2, annotation_folder=None,
-                                        augmentation=None,
-                                        input_types=[],
-                                        label_types=['3D'],
-                                        input_img_width=512, map_width=32,
-                                        subjects=[0, 1, 2, 3, 4, 5],  # [0]
-                                        useCamBatches=0,
-                                        useSequentialFrames=False,
-                                        every_nth_frame=0,
-                                        joint_transformation=utils_plt.ski_spoerri_to_human_ski,
-                                        root_index=utils_plt.root_index_ski)
-        from models import ski_losses
-
-        metric_functions = ski_losses.metric_functions
-        values = []
-        for fi in range(len(dataset)):
-            inputs, labels = dataset.__getitem__(fi)
-            label = labels['3D'][np.newaxis, :]  # unsqueeze to create batch of sizez one
-            variables = [m(label) for k, m in metric_functions.items()]
-            values.append(variables)
-        # compute statistics
-        values_t = list(zip(*values))
-        means = {list(metric_functions.keys())[i]: np.mean(vs, axis=0) for i, vs in enumerate(values_t)}
-        stds = {list(metric_functions.keys())[i]: np.std(vs, axis=0) for i, vs in enumerate(values_t)}
-
-        print('means\n', means)
-        print('stds\n', stds)
-        IPython.embed()
-        # with height-normalized COM
-        # means
-        # [array([101.71707153], dtype=float32), array([83.99815369], dtype=float32), array([42.10571611]),
-        #  array([23.4648078]), array([[0.242444, 17.34125806, -0.69932613]])]
-        # stds
-        # [array([22.40592384], dtype=float32), array([25.14748764], dtype=float32), array([17.56942033]),
-        # array([14.2412763]), array([[11.04716213, 3.89698341, 7.43379852]])]
-
-        # statistics for s0:
-        # In[13]: means
-        # Out[13]:
-        # [array([97.63584137], dtype=float32),
-        #  array([81.58532715], dtype=float32),
-        #  array([40.54452728]),
-        #  array([20.85442598]),
-        #  array([[-0.00055913, 0.29440499, -0.00907887]])]
-        #
-        # In[14]: stds
-        # Out[14]:
-        # [array([21.25689888], dtype=float32),
-        #  array([26.60981369], dtype=float32),
-        #  array([17.46862786]),
-        #  array([13.19865201]),
-        #  array([[0.19126413, 0.07444175, 0.12811064]])]
-        # statistics across all subjects:
-        # In[2]: means
-        # Out[2]:
-        # [array([101.71707153], dtype=float32),
-        #  array([83.99815369], dtype=float32),
-        #  array([42.10571611]),
-        #  array([23.4648078]),
-        #  array([[0.00207333, 0.30503755, -0.01100718]])]
-        #
-        # In[3]: stds
-        # Out[3]:
-        # [array([22.40592384], dtype=float32),
-        #  array([25.14748764], dtype=float32),
-        #  array([17.56942033]),
-        #  array([14.2412763]),
-        #  array([[0.19052907, 0.06844954, 0.13101918]])]
-
-    # save dataset
-    if 1:
-        dataset = SkiPanTiltDataset_DLT(base_folder=dataset_folder,
-                                        augmentation=None,
-                                        input_types=['img_crop'],
-                                        label_types=['3D', '2D', 'trial', 'image_frame', 'camera'],
-                                        input_img_width=512, map_width=32,
-                                        subjects=[0],  # [0, 1, 2, 3, 4, 5]
-                                        useCamBatches=0,
-                                        useSequentialFrames=False,
-                                        every_nth_frame=0,
-                                        # joint_transformation=utils_plt.ski_spoerri_to_hum,
-                                        # root_index=utils_plt.root_index_h36m)
-                                        joint_transformation=utils_plt.ski_spoerri_to_human_ski,
-                                        root_index=utils_plt.root_index_ski)
-
-        for fi in range(0, 3000, 1):
-            #    for fi in [100,101,102,103,104,105,106,107,108,109,110,200,250,300,350,400,450,500,550]:
-            inputs, labels = dataset.__getitem__(fi)
-
-            camera = int(labels['camera'])
-            frame = int(labels['image_frame'])
-            trial = int(labels['trial'])
-            img = inputs['img_crop']
-
-            import scipy.misc
-
-            # scipy.misc.imsave('img_{:04d}_cam_{:04d}.png'.format(frame,camera), img)
-
-
-
-            if 0:
-                plt.switch_backend('Qt5Agg')
-                fig = plt.figure(0)
-                ax = fig.add_subplot(111, projection='3d')
-                pose_3d = labels['3D']
-                utils_plt.plot_3Dpose(ax, pose_3d.reshape(-1, 3).T, bones=utils_plt.bones_h36m, radius=0.01,
-                                      set_limits=False)
-                ax.invert_zaxis()
-                ax.grid(False)
-                plt.axis('off')
-                plt.show()
-                plt.savefig('pose_w_cam_{:02d}_frame{:04d}.png'.format(camera, frame), dpi=600)
-
-            if 1:
-                # plt.switch_backend('Qt5Agg')
-                fig = plt.figure(0)
-                plt.clf()
-                # input image
-                ax = fig.add_subplot(311)
-                ax.imshow(img)
-
-                # 2D pose
-                pose_2d = labels['2D']
-                ax = fig.add_subplot(313)
-                ax.imshow(inputs['img_crop'])
-                utils_plt.plot_2Dpose(ax,
-                                      np.diag(np.flip(inputs['img_crop'].shape[:2], axis=0)) @ pose_2d.reshape(-1, 2).T,
-                                      bones=utils_plt.bones_h36m)
-
-                # 3D pose
-                pose_3d = labels['3D']
-                ax = fig.add_subplot(312, projection='3d')
-                utils_plt.plot_3Dpose(ax, pose_3d.reshape(-1, 3).T, bones=utils_plt.bones_h36m, radius=0.01,
-                                      set_limits=False)
-                ax.invert_zaxis()
-                filename = './TMP/X/pose_w_trial{}_cam_{:02d}_frame{:04d}.png'.format(trial, camera, frame)
-                ax.set_xlabel(filename)
-                ax.set_ylabel('y')
-                ax.set_zlabel('z')
-
-                #            plt.show()
-                plt.savefig(filename, dpi=600)
-                print('saved', filename)

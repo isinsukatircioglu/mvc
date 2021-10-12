@@ -14,7 +14,7 @@ Please contact the authors (isinsu.katircioglu@gmail.com, joerg.spoerri@balgrist
   
 ## Training
   - Download the Ski-PTZ dataset. The dataset should include subfolders named Videos_small, Videos, Data and Segmentation_masks.
-  - Change the dataset path in dataset/dataset_factory.py. 
+  - Change the dataset path in datasets/dataset_factory.py. 
   - Download the [pre-trained models](https://drive.google.com/drive/folders/1oeY6SQwMwXiQJReDv-5dTyZcp_WBPofj?usp=sharing).
   - Create a folder named pretrained in the cloned directory and put the pre-trained models inside.
   

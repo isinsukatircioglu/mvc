@@ -5,6 +5,9 @@ This is the source code for the ICCV 2021 paper "Human Detection and Segmentatio
 <li> Python 3.6
 <li> PyTorch 1.5
 <li> Cuda 9.2
+	
+## Dataset
+Please contact the authors (isinsu.katircioglu@gmail.com, joerg.spoerri@balgrist.ch) to have access to the Ski-PTZ dataset.
   
 ## Training
   - Change the dataset path in the files dataset/dataset_factory.py and dataset/SkiPTZ.py. 

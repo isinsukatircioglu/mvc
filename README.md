@@ -1,5 +1,5 @@
 # Human Detection and Segmentation via Multi-view Consensus 
-This is the source code for the ICCV 2021 paper "Human Detection and Segmentation via Multi-view Consensus".
+This is the source code for the ICCV 2021 paper ["Human Detection and Segmentation via Multi-view Consensus"](https://openaccess.thecvf.com/content/ICCV2021/papers/Katircioglu_Human_Detection_and_Segmentation_via_Multi-View_Consensus_ICCV_2021_paper.pdf).
 <p align="center">
 <img src="multiview_consensus.png" width="50%" height="50%">
 </p>
